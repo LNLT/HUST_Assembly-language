@@ -1,0 +1,317 @@
+NAME  WAN2
+EXTRN  GA1:BYTE, N:ABS, GOOD:WORD, AUTH:BYTE
+PUBLIC  PRINT, C6
+
+.386
+INCLUDE  MACRO.LIB
+
+STACK 	SEGMENT USE16  STACK
+	DB 100 DUP(0)
+STACK 	ENDS
+
+DATA	SEGMENT USE16 PARA PUBLIC 'DATA'
+	BUF		DB  12DUP(?)
+	ZHEKOU		DB  'zhekou: $'
+	IN_MONEY	DB  'in_money : $'
+	OUT_MONEY	DB  'out_money : $'
+	IN_NUM		DB  'in_num : $'
+	ERRORHP	DB  'Please Login! $'
+	ERRORG		DB  'No good! $'
+	IN_VALUE 	DB  10		;用来存储输入的要修改的信息
+			DB  ?
+			DB  10 DUP(0)
+DATA	ENDS
+
+CODE	SEGMENT USE16 PARA PUBLIC 'CODE'
+	ASSUME  CS:CODE, SS:STACK, DS:DATA
+
+C6	PROC
+	CMP	AUTH,1
+	JNE	ERROR
+	MOV	SI,GOOD
+	CMP 	SI, 'Q'
+	JE	ERROR1
+	ADD	SI,10
+DISCOUNT:
+	OUT9	ZHEKOU
+	MOV	AH,0
+	MOV	AL,BYTE	PTR [SI]
+	MOV	DX,16
+	CALL	F2T10
+	OUT2	3EH;打印>号
+	IN10	IN_VALUE	;输入修改信息
+	CRLF
+	LEA 	DX,IN_VALUE
+	MOV 	DI,DX
+	INC 	DI
+	MOV	BL,[DI]
+	CMP 	BL,0
+	JZ	INMON		;输入回车跳过该项修改,进入下一项
+	CMP 	BL,2		;折扣不能超过两位数
+	JS  	DISCOUNT1
+	JMP  	DISCOUNT	;如果输入信息不符合标准，则重新修改
+DISCOUNT1 :
+	MOV 	CL,BL		;将输入信息的字符个数送到BL中
+	MOV 	CH,0
+	MOV 	AX,0
+DISCOUNT_LOPA :			;整体是为了一个字符一个字符进行比较
+	INC 	DI
+	MOV 	BL,[DI]
+	CMP 	BL,29H		;ACSII码要大于29H小于3AH,即输入的数字每一位在0--9
+	JNS 	DISCOUNT2
+	JMP  	DISCOUNT
+DISCOUNT2 :
+	CMP 	BL,3AH		;ACSII码要大于29H小于3AH,即输入的数字每一位在0--9
+	JS 	DISCOUNT3
+	JMP  	DISCOUNT
+DISCOUNT3 :		
+	ADD 	AL,BL
+	SUB 	AL,30H		
+	DEC 	CX
+	CMP	CX,0		;如果比较完了，那么就跳到下一项信息进行修改
+	JE	DISCOUNT4
+	MOV	BL,10
+	MUL 	BL
+	JMP 	DISCOUNT_LOPA
+DISCOUNT4 :
+	MOV 	[SI],AL
+	
+
+INMON:
+	INC 	SI		;指向进货价
+	OUT9	IN_MONEY
+	MOV	AX, [SI]
+	MOV	DX,16
+	CALL	F2T10
+	OUT2	3EH;打印>号
+	IN10	IN_VALUE		;输入修改信息
+	CRLF
+	LEA 	DX,IN_VALUE
+	MOV 	DI,DX
+	INC 	DI
+	MOV	BL,[DI]
+	CMP 	BL,0
+	JZ	BUY		;输入回车跳过该项修改,进入下一项
+	CMP 	BL,4		;折扣不能超过两位数
+	JS  	INMON1
+	JMP  	INMON		;如果输入信息不符合标准，则重新修改
+INMON1 :
+	MOV 	CL,BL		;将输入信息的字符个数送到BL中
+	MOV 	CH,0
+	MOV 	AX,0
+INMON_LOPA :			;整体是为了一个字符一个字符进行比较
+	INC 	DI
+	MOV 	BL,[DI]
+	CMP 	BL,29H		;ACSII码要大于29H小于3AH,即输入的数字每一位在0--9
+	JNS 	INMON2
+	JMP  	INMON
+INMON2 :
+	CMP 	BL,3AH		;ACSII码要大于29H小于3AH,即输入的数字每一位在0--9
+	JS 	INMON3
+	JMP  	INMON
+INMON3 :		
+	ADD 	AL,BL
+	SUB 	AL,30H		
+	DEC 	CX
+	CMP	CX,0		;如果比较完了，那么就跳到下一项信息进行修改
+	JE	INMON4
+	MOV	BL,10
+	MUL 	BL
+	JMP 	INMON_LOPA
+INMON4 :
+	MOV 	[SI],AL
+	
+
+
+BUY:
+	ADD 	SI,2		;指向售货价
+	OUT9	OUT_MONEY
+	MOV	AX, [SI]
+	MOV	DX,16
+	CALL	F2T10
+	OUT2	3EH;打印>号
+	IN10	IN_VALUE	;输入修改信息
+	CRLF
+	LEA 	DX,IN_VALUE
+	MOV 	DI,DX
+	INC 	DI
+	MOV	BL,[DI]
+	CMP 	BL,0
+	JZ	NUM		;输入回车跳过该项修改,进入下一项
+	CMP 	BL,4		;折扣不能超过两位数
+	JS  	BUY1
+	JMP  	BUY		;如果输入信息不符合标准，则重新修改
+BUY1 :
+	MOV 	CL,BL		;将输入信息的字符个数送到BL中
+	MOV 	CH,0
+	MOV 	AX,0
+BUY_LOPA :			;整体是为了一个字符一个字符进行比较
+	INC 	DI
+	MOV 	BL,[DI]
+	CMP 	BL,29H		;ACSII码要大于29H小于3AH,即输入的数字每一位在0--9
+	JNS 	BUY2
+	JMP  	BUY
+BUY2 :
+	CMP 	BL,3AH		;ACSII码要大于29H小于3AH,即输入的数字每一位在0--9
+	JS 	BUY3
+	JMP  	BUY
+BUY3 :		
+	ADD 	AL,BL
+	SUB 	AL,30H		
+	DEC 	CX
+	CMP	CX,0		;如果比较完了，那么就跳到下一项信息进行修改
+	JE	BUY4
+	MOV	BL,10
+	MUL 	BL
+	JMP 	BUY_LOPA
+BUY4 :
+	MOV 	[SI],AL
+	
+
+
+NUM:
+	ADD 	SI,2		;指向进货量
+	OUT9	IN_NUM
+	MOV	AX,[SI]
+	MOV	DX,16
+	CALL	F2T10
+	OUT2	3EH;打印>号
+	IN10	IN_VALUE	;输入修改信息
+	CRLF
+	LEA 	DX,IN_VALUE
+	MOV 	DI,DX
+	INC 	DI
+	MOV	BL,[DI]
+	CMP 	BL,0
+	JZ	EXIT		;输入回车跳过该项修改,进入下一项
+	CMP 	BL,4		;折扣不能超过两位数
+	JS  	NUM1
+	JMP  	NUM	;如果输入信息不符合标准，则重新修改
+NUM1 :
+	MOV 	CL,BL		;将输入信息的字符个数送到BL中
+	MOV 	CH,0
+	MOV 	AX,0
+NUM_LOPA :			;整体是为了一个字符一个字符进行比较
+	INC 	DI
+	MOV 	BL,[DI]
+	CMP 	BL,29H		;ACSII码要大于29H小于3AH,即输入的数字每一位在0--9
+	JNS 	NUM2
+	JMP  	NUM
+NUM2 :
+	CMP 	BL,3AH		;ACSII码要大于29H小于3AH,即输入的数字每一位在0--9
+	JS 	NUM3
+	JMP  	NUM
+NUM3 :		
+	ADD 	AL,BL
+	SUB 	AL,30H		
+	DEC 	CX
+	CMP	CX,0		;如果比较完了，那么就跳到下一项信息进行修改
+	JE	NUM4
+	MOV	BL,10
+	MUL 	BL
+	JMP 	NUM_LOPA
+NUM4 :
+	MOV 	[SI],AL
+	JMP	EXIT
+
+ERROR:	
+	OUT9	ERRORHP
+	CRLF
+	JMP	EXIT
+ERROR1:
+	OUT9	ERRORG
+	CRLF
+EXIT:	RET
+C6	ENDP
+
+PRINT	PROC
+	PUSH	AX
+	PUSH	BX
+	PUSH	CX
+	PUSH	DX
+	PUSH	DI
+	PUSH	SI
+
+	LEA	DI,GA1
+	MOV	SI,DI
+	MOV	BX,N
+NEXT:	MOV 	DX,DI 		;输出商品名
+	MOV 	AH,9
+	INT 	21H
+	OUT2	' '
+	ADD	DI,10
+	MOV	AH,0
+	MOV	AL,BYTE	PTR [DI]
+	MOV	DX,16
+	CALL	F2T10		;输出折扣
+	OUT2	' '
+	INC	DI
+	MOV	CX,5		;数字个数
+LOPA:	MOV	AX,[DI]
+	MOV	DX,16
+	CALL	F2T10		;输出进价、售价、进货量、已售、推荐度
+	OUT2	' '
+	ADD	DI,2
+	DEC	CX
+	CMP	CX,0
+	JNE	LOPA
+	CRLF
+	ADD	SI, 21
+	MOV	DI, SI
+	DEC	BX
+	CMP	BX,0
+	JNE	NEXT		;进入下一个商品
+	POP	SI
+	POP	DI
+	POP	DX
+	POP	CX
+	POP	BX
+	POP	AX
+	RET
+PRINT	ENDP
+
+F2T10	PROC
+	PUSH	EBX
+	PUSH	SI
+	LEA	SI,BUF
+	CMP	DX,32
+	MOVSX	EAX,AX
+B:	OR	EAX,EAX
+	JNS	PLUS
+	NEG	EAX
+	MOV	BYTE  PTR  [SI], '-'
+	INC	SI
+PLUS:	MOV	EBX,10
+	CALL	RADIX
+	MOV	BYTE  PTR  [SI], '$'
+	OUT9	BUF
+	POP	SI
+	POP	EBX
+	RET
+F2T10	ENDP
+
+RADIX	PROC
+	PUSH	CX
+	PUSH	EDX
+	XOR	CX,CX
+LOP1:	XOR	EDX,EDX
+	DIV	EBX
+	PUSH	DX
+	INC	CX
+	OR	EAX,EAX
+	JNZ	LOP1
+LOP2:	POP	AX
+	CMP	AL,10
+	JB	L1
+	ADD	AL,7
+L1:	ADD	AL,30H
+	MOV	[SI],AL
+	INC	SI
+	LOOP	LOP2
+	POP	EDX
+	POP	CX
+	RET
+RADIX	ENDP
+
+CODE	ENDS
+	END 
